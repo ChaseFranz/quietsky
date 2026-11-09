@@ -1,19 +1,18 @@
 # quietsky
 
-Find and remove the aircraft sounds that can geolocate your recordings, before you publish.
+Find and remove the faint aircraft sounds that can reveal where a recording was made, before you publish it.
 
-**Threat (Colsto, "I discovered a sound that leaks your exact location", Nov 2026):** inaudible propeller-plane tones in a recording trace Doppler pitch curves. His pipeline, in outline:
-- Filter a day of US ADS-B data to non-jet aircraft.
-- For grid points, compute the delayed closest-approach time: when the closest point of each pass would actually be heard, after sound travel time, using slant distance and terrain elevation.
-- Keep points that heard two flights at the observed gap (920 s, about ±5 s). Fitting each curve gives speed and slant distance, which narrows further.
-- Drop points that would have heard any *other* flight in between. Silence is a signal too.
-- Score the survivors by modeling each exact Doppler curve from the real flight geometry, with propagation delay, and summing spectrogram brightness along it.
+## What this is, in plain English
 
-Result: about 100 m from one minute of audio. With a known recording time (e.g. a phone call), a single flyover was enough, even one he could only see after zooming into the right band and tracing it by hand.
+Almost every outdoor recording picks up aircraft passing miles away, even when nobody can hear them. In November 2026, the creator Colsto [showed](https://www.youtube.com/watch?v=UytYrhYLOKI) that those sounds, compared with public flight-tracking data, can locate where a recording was made, sometimes to within about 100 meters, with nothing identifiable on screen.
 
-What he showed does **not** work as a defense: high-pass filtering (the tones sit in the voice band, and a high-passed MP3 brought the curve back when boosted), drowning it out with louder sound, and phone-call compression with noise reduction (the curve survived). What does help: cuts, which break the time gaps, and extra noise cancellation.
+quietsky checks your audio and video for those traces and removes them, so a stream, a source's footage or a home video doesn't give away a location. It's meant for streamers, journalists and their sources, activists, people in sensitive situations, and anyone posting from a fixed camera.
 
-quietsky is defensive only. It finds these traces in your own audio or video and removes them. It does not match recordings against flight data to find where something was recorded.
+A few things that **don't** protect you, based on his demonstration: cutting the low frequencies (the traces sit in the same range as voice), talking or playing music over them, and phone-call compression. Cutting the recording into pieces does help, because it breaks up the timing between planes.
+
+quietsky is defensive only. It never works out where a recording was made.
+
+Right now it runs from the command line, so the rest of this page assumes some comfort with a terminal. A simpler app is on the roadmap.
 
 ## Install
 
