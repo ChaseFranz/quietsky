@@ -80,3 +80,7 @@ The test scenes are physically modeled: straight-line flyovers with propagation 
 - Two scrub passes are the default and stop early once the re-scan is clean. Removing a loud flyover can expose a faint one the first scan missed, and the second pass catches it.
 - For truly sensitive footage the only complete defense is replacing the ambient track (music, voice-over, or room tone recorded elsewhere). Cutting and re-editing also helps, because it breaks the time gaps between flyovers.
 - `exposure`: flight-path-mapper's GeoJSON has no timestamps or altitude, so this gives daily volume, not an hourly schedule.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

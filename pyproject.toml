@@ -3,6 +3,7 @@ name = "quietsky"
 version = "0.1.0"
 description = "Find and remove aircraft Doppler traces that can geolocate audio/video recordings"
 requires-python = ">=3.10"
+license = { text = "MIT" }
 dependencies = ["numpy>=1.24", "scipy>=1.10"]
 
 [project.optional-dependencies]
