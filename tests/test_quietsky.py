@@ -73,3 +73,58 @@ def test_exposure(tmp_path):
     e = exposure(p, lat, lon, radius_km=5)
     assert e["aircraft_per_day"] == 1 and e["within_1km"] == 1
     assert e["top_types"][0][0] == "C172"
+
+
+# ---------------------------------------------------------------- live mode
+
+from quietsky.stream import StreamConfig, StreamProcessor  # noqa: E402
+
+
+def _run_stream(x, cfg, block=1024):
+    sp = StreamProcessor(cfg)
+    return np.concatenate([sp.process(x[i:i + block]) for i in range(0, len(x), block)] + [sp.flush()])
+
+
+def _curve_energy(x, sr, flyover):
+    from scipy import signal as sig
+    from quietsky.core import DetectConfig, _whiten, spectrogram
+    dc = DetectConfig()
+    xx = sig.resample_poly(x, dc.analysis_sr, sr)
+    f, t, P = spectrogram(xx, dc.analysis_sr, dc)
+    W = _whiten(P, 6)
+    tc, v, d, fb = flyover
+    vals = []
+    for n in (1, 2, 3, 4):
+        for j, tj in enumerate(t):
+            te = tj
+            for _ in range(8):
+                te = tj - np.hypot(d, v * (te - tc)) / 343
+            r = np.hypot(d, v * (te - tc))
+            fr = fb * n / (1 + v * v * (te - tc) / r / 343)
+            if abs(te - tc) < 25 and fr < 1500:
+                i = np.argmin(abs(f - fr))
+                vals.append(W[max(i - 1, 0):i + 2, j].max())
+    return float(np.mean(vals))
+
+
+@pytest.mark.parametrize("n,block", [(48000 * 3, 1000), (48000 * 3 + 777, 4096), (50000, 333)])
+def test_stream_passthrough_is_exact(n, block):
+    x = np.random.default_rng(0).standard_normal(n) * 0.1
+    cfg = StreamConfig(latency_s=0.5)
+    y = _run_stream(x, cfg, block)
+    assert len(y) == n
+    assert np.sqrt(np.mean((y - x) ** 2)) / 0.1 < 1e-4      # whole array, edges included
+
+
+def test_stream_leaves_plane_free_audio_untouched():
+    y, sr = make_scene(planes=False, hum=True, seed=7, tone_db=-14)
+    out = _run_stream(y, StreamConfig(sr=sr, latency_s=3.0))
+    assert np.sqrt(np.mean((out - y) ** 2)) / np.sqrt(np.mean(y ** 2)) < 1e-4
+
+
+def test_stream_with_long_delay_suppresses_loud_flyover():
+    y, sr = make_scene(seed=2, tone_db=-14)
+    out = _run_stream(y, StreamConfig(sr=sr, latency_s=35.0), block=4096)
+    loud = (105, 55, 1100, 118)
+    assert _curve_energy(y, sr, loud) > 4.5          # clearly present before
+    assert _curve_energy(out, sr, loud) < 2.5        # near the noise floor after

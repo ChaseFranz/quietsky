@@ -30,6 +30,7 @@ quietsky scan  clip.mp4 --json
 quietsky scrub clip.mp4 clip_clean.mp4   # removes traces, re-scans the output, copies video untouched, strips metadata
 quietsky scrub clip.mp4 out.mp4 --hum    # also remove steady tones incl. 50/60 Hz mains hum
 quietsky exposure --geojson minneapolis-80mi.geojson --lat 44.85 --lon -93.47 --radius-km 5
+quietsky stream clip.mp4 clip_live.mp4 --latency 30   # experimental: what live mode would output
 ```
 
 Sample scan output:
@@ -41,6 +42,24 @@ Aircraft-trace geolocation risk: HIGH
   Gaps between flyovers (s): [65.7]  <- strongest triangulation clue
   steady tone 60.0 Hz  [60 Hz grid: reveals grid region; ENF can reveal recording time]
 ```
+
+## Live mode (experimental)
+
+`quietsky.stream.StreamProcessor` processes audio block by block with a fixed output delay, the shape a streaming plugin needs. `quietsky stream IN OUT --latency 30` runs a file through it exactly as live mode would.
+
+**The physics sets the price.** Before closest approach, an approaching plane's tone is a steady, high, nearly flat pitch, indistinguishable from any other steady tone. The falling Doppler glide that identifies it only appears as the plane passes. A live tool can't cut what it can't identify yet, so how much of each flyover gets removed depends on how long the output is held back:
+
+| Output delay | Loud flyover residual (orig 5.1, noise floor ~1.3) | Quiet flyover (orig 3.4) | What's covered |
+|---|---|---|---|
+| 3 s | ~4.2 | ~2.7 | only after the pass is identified; the approach leaks |
+| 20 s | 2.3 | 1.9 | most of the approach |
+| 35 s | 1.9 | 1.6 | matches the whole-file scrubber (~2.0 / ~1.6) |
+
+Runs about 2.2× faster than real time on one Python core.
+
+How it works: every 3 s, the batch detector (`core.detect`) runs on the last 48 s of audio. Its fitted curves are notched out of the delayed output by overlap-add, with the same dB-matched noise refill as the batch scrubber, and extended by 3τ because the fit extrapolates well. Because overlapping windows re-test nearly the same audio dozens of times, a curve is only cut once **three** refreshes produce fits that trace the same tone, and curves below 60 Hz (where rumble and hum make false glides) are ignored. In testing, that left plane-free audio bit-exact in every scene tried. `--aggressive` cuts after two agreeing refreshes: it catches more, but altered plane-free audio in every scene tested.
+
+For a streamer, the practical setup is a ~30 s broadcast delay. For anything sensitive or archived, scrub the file afterwards with `quietsky scrub`. A real plugin (OBS/VST) would port the DSP core to native code; channels are currently processed independently.
 
 ## How it works
 
